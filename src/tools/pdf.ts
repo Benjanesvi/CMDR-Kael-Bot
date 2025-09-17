@@ -5,10 +5,6 @@ import { BGS_PDF_URL } from "../config.js";
 let chunks: { text: string }[] = [];
 let loaded = false;
 
-/**
- * Fetch and parse the remote PDF, chunk into paragraphs.
- * Call this at startup: await loadPDF();
- */
 export async function loadPDF() {
   if (loaded) return;
   if (!BGS_PDF_URL) {
@@ -24,10 +20,10 @@ export async function loadPDF() {
     const buf = Buffer.from(ab);
     const data = await pdf(buf);
     const raw = (data.text || "").replace(/\r\n/g, "\n");
-    // Basic chunking: split on double newlines, trim, keep non-empty.
-    const paras = raw.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+    const paras = raw.split(/\n{2,}/).map((p: string) => p.trim()).filter(Boolean);
     const minLen = 80;
-    chunks = paras.map(t => ({ text: t })).filter(c => c.text.length >= minLen);
+    chunks = paras.map((t: string) => ({ text: t }))
+                  .filter((c: { text: string }) => c.text.length >= minLen);
     console.log(`[pdf] Loaded PDF, ${chunks.length} chunks.`);
   } catch (err) {
     console.error("[pdf] Error loading PDF:", err);
@@ -37,20 +33,13 @@ export async function loadPDF() {
   }
 }
 
-/**
- * Simple search: returns the first N chunks that include the query terms (case-insensitive).
- * This is intentionally simple. Replace with embeddings if you have them.
- */
 export function queryPDF(query: string, limit = 5) {
-  if (!loaded) {
-    console.warn("[pdf] queryPDF called before loadPDF completed.");
-  }
+  if (!loaded) console.warn("[pdf] queryPDF before loadPDF finished.");
   if (!query) return [];
   const q = query.toLowerCase();
-  const out = [];
+  const out: { text: string }[] = [];
   for (const c of chunks) {
-    const text = c.text.toLowerCase();
-    if (text.includes(q)) out.push(c);
+    if (c.text.toLowerCase().includes(q)) out.push(c);
     if (out.length >= limit) break;
   }
   return out;

@@ -1,37 +1,48 @@
-import { request } from "undici";
-import { cached } from "../cache.js";
+// src/tools/inara.ts
+// Thin wrapper for Inara API (faction info, commander info, etc.)
+import fetch from "node-fetch";
 
-const INARA_API_KEY = process.env.INARA_API_KEY;
-const TTL_24H = 86400;
+const BASE = "https://inara.cz/inapi/v1/";
 
-export async function toolINARA({ commander, squadron }: { commander?: string; squadron?: string }) {
-  if (!INARA_API_KEY) return { error: "INARA API key missing in env." };
-  if (!commander && !squadron) return { error: "Provide 'commander' or 'squadron'." };
+/**
+ * Perform a POST to Inara with your API key and payload.
+ */
+async function inaraPost(eventName: string, data: any) {
+  if (!process.env.INARA_API_KEY) {
+    throw new Error("INARA_API_KEY not configured.");
+  }
+  const body = {
+    header: {
+      appName: "CMDR-Kael",
+      appVersion: "0.1",
+      isTesting: false,
+      APIkey: process.env.INARA_API_KEY,
+    },
+    events: [{ eventName, eventTimestamp: new Date().toISOString(), eventData: data }],
+  };
 
-  const cacheKey = `inara:${(commander || "").toLowerCase()}:${(squadron || "").toLowerCase()}`;
-
-  return cached(cacheKey, TTL_24H, async () => {
-    const events: any[] = [];
-    const now = new Date().toISOString();
-
-    if (commander) events.push({ eventName: "getCommanderProfile", eventTimestamp: now, eventData: { searchName: commander } });
-    if (squadron)  events.push({ eventName: "getSquadron",         eventTimestamp: now, eventData: { searchName: squadron } });
-
-    const body = {
-      header: { appName: "SpaceForceBot", appVersion: "0.1", isTesting: 0, APIkey: INARA_API_KEY },
-      events
-    };
-
-    const res = await request("https://inara.cz/inapi/v1/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    if (res.statusCode >= 400) {
-      const text = await res.body.text();
-      throw new Error(`INARA ${res.statusCode}: ${text?.slice(0, 500)}`);
-    }
-    return await res.body.json();
+  const res = await fetch(BASE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(`Inara POST ${eventName} → ${res.status}`);
+  const json = await res.json();
+  return json;
+}
+
+/**
+ * Get faction info from Inara (fallback when EDSM doesn't provide).
+ */
+export async function bgsFactions(systemName: string) {
+  const result = await inaraPost("getSystemFactions", { systemName });
+  return result;
+}
+
+/**
+ * Get commander info (if you extend tools later).
+ */
+export async function commanderInfo(commanderName: string) {
+  const result = await inaraPost("getCommanderProfile", { searchName: commanderName });
+  return result;
 }
