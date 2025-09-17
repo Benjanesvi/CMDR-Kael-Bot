@@ -10,15 +10,26 @@ services:
     startCommand: |
       node --enable-source-maps dist/index.js
     envVars:
+      # set explicit defaults here
       - key: NODE_VERSION
-        value: 22
-      - key: DISCORD_TOKEN
-      - key: OPENAI_API_KEY
-      - key: OPENAI_MODEL
-      - key: TARGET_CHANNEL_ID
-      - key: ADMIN_IDS
-      - key: BGS_PDF_URL
-      - key: UPSTASH_REDIS_REST_URL
-      - key: UPSTASH_REDIS_REST_TOKEN
+        value: "22"
       - key: CACHE_TTL_HOURS
         value: "24"
+
+      # mark secrets to be entered in the dashboard (no defaults)
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: TARGET_CHANNEL_ID
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: BGS_PDF_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
