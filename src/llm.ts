@@ -13,10 +13,10 @@ function trimDiscord(s: string, max = 8000) {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
+// Chat Completions "functions" (aka tools)
 const tools = [
   {
     type: "function" as const,
-    strict: true,
     name: "toolLIVE",
     description: "Elite Dangerous live intel.",
     parameters: {
@@ -30,15 +30,18 @@ const tools = [
         faction: { type: "string" },
         commander: { type: "string" },
         showHistory: { type: "boolean" },
+        x: { type: "number" },
+        y: { type: "number" },
+        z: { type: "number" },
       },
       required: ["detail"],
+      additionalProperties: false,
     },
   },
   {
     type: "function" as const,
-    strict: true,
     name: "toolBGS_PDF",
-    description: "Search Black Sun Crew BGS PDF.",
+    description: "Search Black Sun Crew BGS PDF for relevant guidance.",
     parameters: {
       type: "object",
       properties: {
@@ -46,19 +49,22 @@ const tools = [
         limit: { type: "number" },
       },
       required: ["query"],
+      additionalProperties: false,
     },
   },
 ];
 
 async function runToolByName(name: string, args: any) {
   switch (name) {
-    case "toolLIVE": return await toolLIVE(args || {});
+    case "toolLIVE":
+      return await toolLIVE(args || {});
     case "toolBGS_PDF": {
       const q = String(args?.query || "").slice(0, 240);
       const lim = Math.max(1, Math.min(10, Number(args?.limit ?? 5)));
       return { query: q, results: queryPDF(q, lim) };
     }
-    default: return { error: `Unknown tool: ${name}` };
+    default:
+      return { error: `Unknown tool: ${name}` };
   }
 }
 
@@ -73,66 +79,64 @@ function buildSystem(personaText: string, memText: string) {
   return `${core}\n\n${personaText}\n\n${memText}`;
 }
 
-function extractText(res: any): string {
-  return (res.output_text as string) || "";
-}
-
-type ToolCall = { id: string; name: string; arguments: any };
-
-function extractToolCalls(res: any): ToolCall[] {
-  const calls: ToolCall[] = [];
-  const out = Array.isArray(res?.output) ? res.output : [];
-  for (const item of out) {
-    if (item?.type === "tool_call" && item.name) {
-      let args: any = {};
-      try { args = typeof item.arguments === "string" ? JSON.parse(item.arguments) : item.arguments || {}; }
-      catch { args = item.arguments || {}; }
-      calls.push({ id: item.id || Math.random().toString(36).slice(2), name: item.name, arguments: args });
-    }
-  }
-  return calls;
-}
-
 type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string };
 
 export async function chat(userMessages: Msg[], meta?: { user?: string; channel?: string }) {
   const channelId = meta?.channel || "global";
   const persona = await getPersonaAsync(channelId);
   const personaText = personaOverrideText(persona);
-  const { temperature, presence_penalty, frequency_penalty } = modelParamsFromPersona(persona);
+  const { temperature } = modelParamsFromPersona(persona);
+
   const memText = memoryContext(channelId, persona.max_history || 10);
   const system = buildSystem(personaText, memText);
 
-  const input = [
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: "system", content: system },
-    ...userMessages.map((m) => ({ role: m.role, content: m.content })),
+    ...userMessages.map((m) => ({ role: m.role as any, content: m.content })),
   ];
 
-  const first = await openai.responses.create({
-    input,
-    tools,
+  // First turn
+  const first = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     temperature,
-    strict: true,
-});
+    messages,
+    tools,
+    tool_choice: "auto",
+  });
 
+  const msg = first.choices[0].message;
+  const toolCalls = msg.tool_calls || [];
 
-  const calls = extractToolCalls(first);
-  if (calls.length) {
-    const toolResults: Msg[] = [];
-    for (const c of calls) {
-      const result = await runToolByName(c.name, c.arguments);
-      toolResults.push({ role: "tool", content: JSON.stringify({ name: c.name, args: c.arguments, result }) });
+  if (toolCalls.length > 0) {
+    const toolResults: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    for (const call of toolCalls) {
+      const name = call.function?.name || "";
+      let args: any = {};
+      try {
+        args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
+      } catch {
+        args = {};
+      }
+      const result = await runToolByName(name, args);
+      toolResults.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: JSON.stringify(result),
+      });
     }
 
-    const second = await openai.responses.create({
-      input,
-      tools,
+    const second = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       temperature,
-      strict: true,
+      messages: [
+        ...messages,
+        msg,            // the assistant message that requested tools
+        ...toolResults, // the tool outputs
+      ],
     });
 
-    return trimDiscord(extractText(second));
+    return trimDiscord(second.choices[0].message.content || "");
   }
 
-  return trimDiscord(extractText(first));
+  return trimDiscord(msg.content || "");
 }

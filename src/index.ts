@@ -39,7 +39,7 @@ const client = new Client({
 // ---------------------
 // Health heartbeat setup
 // ---------------------
-const kv = makeUpstashKV("HEALTH");
+const kv = makeUpstashKV(); // your helper takes no args
 const HEARTBEAT_KEY = "health:heartbeat";
 const hostname = os.hostname();
 
@@ -53,8 +53,8 @@ async function writeHeartbeat(extra: Record<string, any> = {}) {
     ...extra,
   };
   try {
-    // TTL 120s so the status page marks us stale if we stop updating
-    await kv.set(HEARTBEAT_KEY, JSON.stringify(payload), { ex: 120 });
+    // your kv.set signature is (key, value, ttlSeconds?)
+    await kv.set(HEARTBEAT_KEY, JSON.stringify(payload), 120);
   } catch (err) {
     console.warn("[health] failed to write heartbeat:", err);
   }
@@ -63,35 +63,21 @@ async function writeHeartbeat(extra: Record<string, any> = {}) {
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
 
-  try {
-    await initCache(CACHE_PATH);
-  } catch (e) {
-    console.warn(e);
-  }
-
-  try {
-    loadPersonaDB();
-  } catch (e) {
-    console.warn(e);
-  }
-
-  try {
-    loadMemoryDB();
-  } catch (e) {
-    console.warn(e);
-  }
+  try { await initCache(CACHE_PATH); } catch (e) { console.warn(e); }
+  try { loadPersonaDB(); } catch (e) { console.warn(e); }
+  try { loadMemoryDB(); } catch (e) { console.warn(e); }
 
   try {
     await loadPDF();
+    // optional metric: include PDF chunk count in heartbeat here if you track it
+    // await writeHeartbeat({ pdfChunks: 96 });
   } catch (e) {
     console.warn(e);
   }
 
   // first heartbeat immediately, then every 30s
   await writeHeartbeat();
-  setInterval(() => {
-    writeHeartbeat().catch(() => {});
-  }, 30_000);
+  setInterval(() => { writeHeartbeat().catch(() => {}); }, 30_000);
 });
 
 async function deliverInChunks(msg: Message, content: string) {
@@ -141,7 +127,7 @@ client.on("messageCreate", async (msg) => {
         resetPersona(msg.channel.id);
         await msg.reply("Persona reset.");
         return;
-        }
+      }
       const toneMatch = /^tone\s+(friendly|neutral|gruff|acerbic)$/i.exec(cmd);
       if (toneMatch) {
         setPersona(msg.channel.id, { tone: toneMatch[1].toLowerCase() as any });
@@ -191,9 +177,7 @@ client.on("messageCreate", async (msg) => {
 
   } catch (e) {
     console.error(e);
-    try {
-      await msg.reply("I hit a snag.");
-    } catch {}
+    try { await msg.reply("I hit a snag."); } catch {}
   }
 });
 
