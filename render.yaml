@@ -2,8 +2,6 @@ services:
   - type: worker
     name: cmdr-kael
     env: node
-    region: oregon
-    plan: starter
     autoDeploy: true
     buildCommand: |
       npm ci
@@ -22,9 +20,11 @@ services:
         sync: false
       - key: ADMIN_IDS
         sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
       - key: CACHE_TTL_HOURS
         value: "24"
-      # Upstash optional (persistent cache / heartbeat writer)
+      # Optional cache (Upstash)
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
@@ -40,7 +40,6 @@ services:
   - type: web
     name: cmdr-kael-status
     env: node
-    region: oregon
     autoDeploy: true
     buildCommand: |
       npm ci
@@ -52,7 +51,6 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
-      # Needs Upstash creds to read heartbeat
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
