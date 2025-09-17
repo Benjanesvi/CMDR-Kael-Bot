@@ -1,17 +1,25 @@
-# render.yaml (Blueprint)
 services:
   - type: worker
     name: cmdr-kael
-    env: docker
-    plan: starter
-    region: oregon
+    env: node
+    plan: professional   # stays up 24/7
+    region: oregon       # pick what's closest to you
     autoDeploy: true
+    buildCommand: |
+      npm ci
+      npm run build
+    startCommand: |
+      node --enable-source-maps dist/index.js
     envVars:
-      - key: NODE_ENV
-        value: production
+      - key: NODE_VERSION
+        value: 22
+      # Put secrets in the Render Dashboard, not here.
+      # The following keys MUST be populated in the dashboard:
       - key: DISCORD_TOKEN
         sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
         sync: false
       - key: TARGET_CHANNEL_ID
         sync: false
@@ -19,9 +27,11 @@ services:
         sync: false
       - key: BGS_PDF_URL
         sync: false
-      - key: CACHE_TTL_HOURS
-        value: "24"
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      # Optional
+      - key: CACHE_TTL_HOURS
+        value: "24"
         sync: false
