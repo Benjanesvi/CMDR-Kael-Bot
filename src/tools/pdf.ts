@@ -1,16 +1,21 @@
 // src/tools/pdf.ts
-// PDF loader with persistent in-memory cache (TTL), safer fetch, and your same public API.
+// PDF loader with persistent in-memory cache (TTL), safer fetch, and the same public API.
+// Import path restored to 'pdf-parse/lib/pdf-parse.js' to match your declaration file.
 
-import pdf from "pdf-parse";
-import { BGS_PDF_URL, PDF_TTL_MS, HTTP_TIMEOUT_MS } from "../config.js";
+import pdf from "pdf-parse/lib/pdf-parse.js";
+import { BGS_PDF_URL } from "../config.js";
 import { Buffer } from "node:buffer";
 
 let chunks: { text: string }[] = [];
 let loaded = false;
 let loadedAt = 0;
 
-const TTL = Number.isFinite(Number(PDF_TTL_MS)) ? Number(PDF_TTL_MS) : 6 * 60 * 60 * 1000; // 6h default
-const TIMEOUT = Number.isFinite(Number(HTTP_TIMEOUT_MS)) ? Number(HTTP_TIMEOUT_MS) : 30_000;
+const TTL = Number.isFinite(Number(process.env.PDF_TTL_MS))
+  ? Number(process.env.PDF_TTL_MS)
+  : 6 * 60 * 60 * 1000; // 6h
+const TIMEOUT = Number.isFinite(Number(process.env.HTTP_TIMEOUT_MS))
+  ? Number(process.env.HTTP_TIMEOUT_MS)
+  : 30_000;
 
 export async function loadPDF(force = false) {
   if (!BGS_PDF_URL) {
@@ -29,7 +34,7 @@ export async function loadPDF(force = false) {
     const res = await fetch(BGS_PDF_URL, {
       method: "GET",
       headers: {
-        "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
+        Accept: "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
         "User-Agent": "CMDR-Kael/1.0 (+render)",
       },
       signal: controller.signal,
@@ -63,7 +68,7 @@ export async function loadPDF(force = false) {
   } catch (err) {
     console.error("[pdf] Error loading PDF:", err);
     if (!loaded) chunks = [];
-    loaded = true; // avoid re-hammering
+    loaded = true; // avoid hammering on repeated calls
   } finally {
     clearTimeout(timeout);
   }

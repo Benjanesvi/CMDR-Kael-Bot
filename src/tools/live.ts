@@ -1,6 +1,5 @@
 // src/tools/live.ts
 // Live data tool with your original UX (validation + friendly errors) and fixed endpoints.
-// Adds a small improvement: 'sphere' accepts either (x,y,z) OR a 'system' center.
 
 import {
   getSystem,
@@ -96,7 +95,6 @@ export async function toolLIVE(rawArgs: any) {
   const radiusLy = asNumber(args.radiusLy, 10);
   const sizeLy = asNumber(args.sizeLy, 10);
 
-  // Validate per-detail (allow sphere by system OR by xyz)
   const REQ: Partial<Record<Detail, string[]>> = {
     snapshot: ["system"],
     bodies: ["system"],
@@ -108,7 +106,6 @@ export async function toolLIVE(rawArgs: any) {
     market: ["system", "station"],
     outfitting: ["system", "station"],
     shipyard: ["system", "station"],
-    // sphere: dynamic: if system present -> ok, else need x,y,z
     cube: ["x", "y", "z"],
   };
 
@@ -116,52 +113,37 @@ export async function toolLIVE(rawArgs: any) {
     const needMsg = need({ system, station, x, y, z }, REQ[detail] ?? []);
     if (needMsg) return err(needMsg);
   } else {
-    // sphere check
     const hasXYZ = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z);
-    if (!system && !hasXYZ) {
-      return err("Missing center for 'sphere': provide 'system' or numeric x,y,z.");
-    }
+    if (!system && !hasXYZ) return err("Missing center for 'sphere': provide 'system' or numeric x,y,z.");
   }
 
   try {
     switch (detail) {
       case "snapshot":
         return await getSystem(system);
-
       case "bodies":
         return await getSystemBodies(system);
-
       case "stations":
         return await getSystemStations(system);
-
       case "traffic":
         return await getSystemTraffic(system);
-
       case "deaths":
         return await getSystemDeaths(system);
-
       case "value":
         return await getSystemValue(system);
-
       case "factions":
         return await bgsFactions(system);
-
       case "market":
         return await getMarket(system, station);
-
       case "outfitting":
         return await getOutfitting(system, station);
-
       case "shipyard":
         return await getShipyard(system, station);
-
       case "sphere": {
         const r = Math.max(1, Math.min(100, radiusLy || 10));
         const hasXYZ = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z);
-        // getSphere supports either xyz or systemName (passed as 5th arg)
         return await getSphere(x, y, z, r, hasXYZ ? undefined : system);
       }
-
       case "cube": {
         const s = Math.max(1, Math.min(200, sizeLy || 10));
         return await getCube(x, y, z, s);

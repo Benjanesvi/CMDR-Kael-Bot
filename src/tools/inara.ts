@@ -1,15 +1,21 @@
 // src/tools/inara.ts
-// INARA INAPI v1 client with light caching for read-like events, retries, and better error surfacing.
-// Keeps your public helpers (e.g., bgsFactions(systemName)).
-//
-// Docs: https://inara.cz/inapi/
+// INARA INAPI v1 with light caching, retries, and clearer errors.
+// Requires INARA_API_KEY from config; appName/appVersion + TTL/timeout come from env or defaults.
 
-import { INARA_API_KEY, INARA_APP_NAME, INARA_APP_VERSION, INARA_TTL_MS, HTTP_TIMEOUT_MS } from "../config.js";
+import { INARA_API_KEY } from "../config.js";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const INARA_BASE = "https://inara.cz/inapi/v1/";
-const TTL = Number.isFinite(Number(INARA_TTL_MS)) ? Number(INARA_TTL_MS) : 60_000; // 60s
-const TIMEOUT = Number.isFinite(Number(HTTP_TIMEOUT_MS)) ? Number(HTTP_TIMEOUT_MS) : 30_000;
+
+const TTL = Number.isFinite(Number(process.env.INARA_TTL_MS))
+  ? Number(process.env.INARA_TTL_MS)
+  : 60_000; // 60s
+const TIMEOUT = Number.isFinite(Number(process.env.HTTP_TIMEOUT_MS))
+  ? Number(process.env.HTTP_TIMEOUT_MS)
+  : 30_000;
+
+const APP_NAME = process.env.INARA_APP_NAME || "CMDR-Kael";
+const APP_VERSION = process.env.INARA_APP_VERSION || "1.0.0";
 
 type InaraEvent = {
   eventName: string;
@@ -21,7 +27,7 @@ type CacheEntry = { t: number; v: any };
 const CACHE = new Map<string, CacheEntry>();
 
 function isCacheable(events: InaraEvent[]) {
-  return events.every(e =>
+  return events.every((e) =>
     ["getCommanderProfile", "getSystemFactions", "getSystem", "getStation"].includes(e.eventName)
   );
 }
@@ -42,8 +48,8 @@ async function postJSON<T>(events: InaraEvent[], retries = 1): Promise<T> {
 
   const body = {
     header: {
-      appName: INARA_APP_NAME || "CMDR-Kael",
-      appVersion: INARA_APP_VERSION || "1.0.0",
+      appName: APP_NAME,
+      appVersion: APP_VERSION,
       APIkey: INARA_API_KEY,
     },
     events,
@@ -55,7 +61,7 @@ async function postJSON<T>(events: InaraEvent[], retries = 1): Promise<T> {
     try {
       const res = await fetch(INARA_BASE, {
         method: "POST",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -73,11 +79,10 @@ async function postJSON<T>(events: InaraEvent[], retries = 1): Promise<T> {
       clearTimeout(timeout);
     }
   }
-  // unreachable
   throw new Error("Unexpected INARA failure");
 }
 
-// ----- Public helpers (keep names used by your code) -----
+// Public helpers
 
 export function bgsFactions(systemName: string) {
   return postJSON([
@@ -99,7 +104,6 @@ export function commanderProfile(cmdrName: string) {
   ]);
 }
 
-// Generic passthrough
 export function inaraPost(events: InaraEvent[]) {
   return postJSON(events);
 }
