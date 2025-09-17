@@ -2,8 +2,7 @@ services:
   - type: worker
     name: cmdr-kael
     env: node
-    plan: professional   # stays up 24/7
-    region: oregon       # pick what's closest to you
+    region: oregon
     autoDeploy: true
     buildCommand: |
       npm ci
@@ -13,25 +12,13 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-      # Put secrets in the Render Dashboard, not here.
-      # The following keys MUST be populated in the dashboard:
       - key: DISCORD_TOKEN
-        sync: false
       - key: OPENAI_API_KEY
-        sync: false
       - key: OPENAI_MODEL
-        sync: false
       - key: TARGET_CHANNEL_ID
-        sync: false
       - key: ADMIN_IDS
-        sync: false
       - key: BGS_PDF_URL
-        sync: false
       - key: UPSTASH_REDIS_REST_URL
-        sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
-        sync: false
-      # Optional
       - key: CACHE_TTL_HOURS
         value: "24"
-        sync: false
