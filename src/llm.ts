@@ -109,14 +109,12 @@ export async function chat(userMessages: Msg[], meta?: { user?: string; channel?
   ];
 
   const first = await openai.responses.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     input,
     tools,
     temperature,
-    presence_penalty,
-    frequency_penalty,
     strict: true,
-  });
+});
+
 
   const calls = extractToolCalls(first);
   if (calls.length) {
@@ -127,11 +125,9 @@ export async function chat(userMessages: Msg[], meta?: { user?: string; channel?
     }
 
     const second = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      input: [...input, ...toolResults],
+      input,
+      tools,
       temperature,
-      presence_penalty,
-      frequency_penalty,
       strict: true,
     });
 
