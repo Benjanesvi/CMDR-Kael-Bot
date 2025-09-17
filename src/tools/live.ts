@@ -1,5 +1,6 @@
 // src/tools/live.ts
-// Live data tool for Elite Dangerous with validation & friendly errors.
+// Live data tool with your original UX (validation + friendly errors) and fixed endpoints.
+// Adds a small improvement: 'sphere' accepts either (x,y,z) OR a 'system' center.
 
 import {
   getSystem,
@@ -31,7 +32,6 @@ type Detail =
   | "cube";
 
 const DETAIL_ALIASES: Record<string, Detail> = {
-  // common aliases / misspellings
   info: "snapshot",
   system: "snapshot",
   station: "stations",
@@ -40,7 +40,6 @@ const DETAIL_ALIASES: Record<string, Detail> = {
   shipyards: "shipyard",
   values: "value",
   faction: "factions",
-  // passthrough for exact names too
   snapshot: "snapshot",
   bodies: "bodies",
   stations: "stations",
@@ -73,9 +72,7 @@ function asNumber(v: any, fallback: number) {
 
 function sanitizeSystem(s: any) {
   const t = String(s ?? "").trim();
-  if (!t) return t;
-  // Hard cap to avoid silly inputs blowing up URLs
-  return t.slice(0, 120);
+  return t ? t.slice(0, 120) : t;
 }
 
 export async function toolLIVE(rawArgs: any) {
@@ -90,7 +87,7 @@ export async function toolLIVE(rawArgs: any) {
     );
   }
 
-  // Normalize common fields
+  // Normalize
   const system = sanitizeSystem(args.system);
   const station = String(args.station ?? "").trim();
   const x = asNumber(args.x, NaN);
@@ -99,8 +96,8 @@ export async function toolLIVE(rawArgs: any) {
   const radiusLy = asNumber(args.radiusLy, 10);
   const sizeLy = asNumber(args.sizeLy, 10);
 
-  // Validate per-detail requirements
-  const REQUIRED: Partial<Record<Detail, string[]>> = {
+  // Validate per-detail (allow sphere by system OR by xyz)
+  const REQ: Partial<Record<Detail, string[]>> = {
     snapshot: ["system"],
     bodies: ["system"],
     stations: ["system"],
@@ -111,15 +108,20 @@ export async function toolLIVE(rawArgs: any) {
     market: ["system", "station"],
     outfitting: ["system", "station"],
     shipyard: ["system", "station"],
-    sphere: ["x", "y", "z"],
+    // sphere: dynamic: if system present -> ok, else need x,y,z
     cube: ["x", "y", "z"],
   };
 
-  const needMsg = need(
-    { system, station, x, y, z },
-    REQUIRED[detail] ?? []
-  );
-  if (needMsg) return err(needMsg);
+  if (detail !== "sphere") {
+    const needMsg = need({ system, station, x, y, z }, REQ[detail] ?? []);
+    if (needMsg) return err(needMsg);
+  } else {
+    // sphere check
+    const hasXYZ = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z);
+    if (!system && !hasXYZ) {
+      return err("Missing center for 'sphere': provide 'system' or numeric x,y,z.");
+    }
+  }
 
   try {
     switch (detail) {
@@ -142,7 +144,6 @@ export async function toolLIVE(rawArgs: any) {
         return await getSystemValue(system);
 
       case "factions":
-        // Inara: system factions (BGS view)
         return await bgsFactions(system);
 
       case "market":
@@ -155,12 +156,14 @@ export async function toolLIVE(rawArgs: any) {
         return await getShipyard(system, station);
 
       case "sphere": {
-        const r = Math.max(1, Math.min(100, radiusLy || 10)); // clamp 1–100 ly
-        return await getSphere(x, y, z, r);
+        const r = Math.max(1, Math.min(100, radiusLy || 10));
+        const hasXYZ = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z);
+        // getSphere supports either xyz or systemName (passed as 5th arg)
+        return await getSphere(x, y, z, r, hasXYZ ? undefined : system);
       }
 
       case "cube": {
-        const s = Math.max(1, Math.min(200, sizeLy || 10)); // clamp 1–200 ly edge
+        const s = Math.max(1, Math.min(200, sizeLy || 10));
         return await getCube(x, y, z, s);
       }
     }

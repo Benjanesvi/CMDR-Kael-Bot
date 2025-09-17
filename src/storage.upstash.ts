@@ -1,8 +1,6 @@
 // src/storage.upstash.ts
 import { KV } from "./storage.js";
-
-const BASE = process.env.UPSTASH_REDIS_REST_URL;
-const TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+import { UPSTASH_REDIS_REST_URL as BASE, UPSTASH_REDIS_REST_TOKEN as TOKEN } from "./config.js";
 
 function url(path: string) {
   return `${BASE}/${path}`;
@@ -24,8 +22,8 @@ export function makeUpstashKV(): KV {
     async get(key) {
       const r = await fetch(url(`get/${encodeURIComponent(key)}`), { headers });
       if (!r.ok) return null;
-      const j = await r.json();
-      return j.result ?? null;
+      const j = await r.json().catch(() => null);
+      return j && typeof j.result !== "undefined" ? j.result : null;
     },
     async set(key, val, ttlSeconds) {
       const path = `set/${encodeURIComponent(key)}/${encodeURIComponent(val)}` +

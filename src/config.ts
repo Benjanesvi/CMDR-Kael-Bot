@@ -2,11 +2,11 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-// Required environment variables
+// Required
 export const DISCORD_TOKEN = process.env.DISCORD_TOKEN || "";
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
-// Optional but strongly recommended
+// Optional (recommended)
 export const TARGET_CHANNEL_ID = process.env.TARGET_CHANNEL_ID || "";
 export const ADMIN_IDS = (process.env.ADMIN_IDS || "")
   .split(",")
@@ -17,7 +17,7 @@ export const ADMIN_IDS = (process.env.ADMIN_IDS || "")
 export const INARA_API_KEY = process.env.INARA_API_KEY || "";
 export const BGS_PDF_URL = process.env.BGS_PDF_URL || "";
 
-// Redis persistence (Upstash)
+// Upstash Redis (optional, used for cache/persona/memory/heartbeat)
 export const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || "";
 export const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || "";
 

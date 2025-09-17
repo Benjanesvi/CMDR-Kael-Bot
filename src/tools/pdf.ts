@@ -1,35 +1,71 @@
 // src/tools/pdf.ts
-import pdf from "pdf-parse/lib/pdf-parse.js";
-import { BGS_PDF_URL } from "../config.js";
+// PDF loader with persistent in-memory cache (TTL), safer fetch, and your same public API.
+
+import pdf from "pdf-parse";
+import { BGS_PDF_URL, PDF_TTL_MS, HTTP_TIMEOUT_MS } from "../config.js";
+import { Buffer } from "node:buffer";
 
 let chunks: { text: string }[] = [];
 let loaded = false;
+let loadedAt = 0;
 
-export async function loadPDF() {
-  if (loaded) return;
+const TTL = Number.isFinite(Number(PDF_TTL_MS)) ? Number(PDF_TTL_MS) : 6 * 60 * 60 * 1000; // 6h default
+const TIMEOUT = Number.isFinite(Number(HTTP_TIMEOUT_MS)) ? Number(HTTP_TIMEOUT_MS) : 30_000;
+
+export async function loadPDF(force = false) {
   if (!BGS_PDF_URL) {
     console.warn("[pdf] BGS_PDF_URL not configured.");
     loaded = true;
     return;
   }
+  const fresh = loaded && Date.now() - loadedAt < TTL;
+  if (fresh && !force) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT);
+
   try {
     console.log("[pdf] Fetching PDF from:", BGS_PDF_URL);
-    const res = await fetch(BGS_PDF_URL);
-    if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
+    const res = await fetch(BGS_PDF_URL, {
+      method: "GET",
+      headers: {
+        "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
+        "User-Agent": "CMDR-Kael/1.0 (+render)",
+      },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Failed to fetch PDF: ${res.status} ${res.statusText}${text ? ` :: ${text.slice(0, 200)}` : ""}`);
+    }
+
     const ab = await res.arrayBuffer();
     const buf = Buffer.from(ab);
     const data = await pdf(buf);
-    const raw = (data.text || "").replace(/\r\n/g, "\n");
-    const paras = raw.split(/\n{2,}/).map((p: string) => p.trim()).filter(Boolean);
+
+    const raw = String(data.text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\u00A0/g, " ");
+
+    const paras = raw
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+
     const minLen = 80;
-    chunks = paras.map((t: string) => ({ text: t }))
-                  .filter((c: { text: string }) => c.text.length >= minLen);
+    chunks = paras.map((t) => ({ text: t })).filter((c) => c.text.length >= minLen);
+
+    loaded = true;
+    loadedAt = Date.now();
     console.log(`[pdf] Loaded PDF, ${chunks.length} chunks.`);
   } catch (err) {
     console.error("[pdf] Error loading PDF:", err);
-    chunks = [];
+    if (!loaded) chunks = [];
+    loaded = true; // avoid re-hammering
   } finally {
-    loaded = true;
+    clearTimeout(timeout);
   }
 }
 
