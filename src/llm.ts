@@ -13,43 +13,47 @@ function trimDiscord(s: string, max = 8000) {
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-// Chat Completions "functions" (aka tools)
-const tools = [
+// Chat Completions tools
+const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    type: "function" as const,
-    name: "toolLIVE",
-    description: "Elite Dangerous live intel.",
-    parameters: {
-      type: "object",
-      properties: {
-        detail: { type: "string" },
-        system: { type: "string" },
-        station: { type: "string" },
-        radiusLy: { type: "number" },
-        sizeLy: { type: "number" },
-        faction: { type: "string" },
-        commander: { type: "string" },
-        showHistory: { type: "boolean" },
-        x: { type: "number" },
-        y: { type: "number" },
-        z: { type: "number" },
+    type: "function",
+    function: {
+      name: "toolLIVE",
+      description: "Elite Dangerous live intel.",
+      parameters: {
+        type: "object",
+        properties: {
+          detail: { type: "string" },
+          system: { type: "string" },
+          station: { type: "string" },
+          radiusLy: { type: "number" },
+          sizeLy: { type: "number" },
+          faction: { type: "string" },
+          commander: { type: "string" },
+          showHistory: { type: "boolean" },
+          x: { type: "number" },
+          y: { type: "number" },
+          z: { type: "number" },
+        },
+        required: ["detail"],
+        additionalProperties: false,
       },
-      required: ["detail"],
-      additionalProperties: false,
     },
   },
   {
-    type: "function" as const,
-    name: "toolBGS_PDF",
-    description: "Search Black Sun Crew BGS PDF for relevant guidance.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: { type: "string" },
-        limit: { type: "number" },
+    type: "function",
+    function: {
+      name: "toolBGS_PDF",
+      description: "Search Black Sun Crew BGS PDF for relevant guidance.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          limit: { type: "number" },
+        },
+        required: ["query"],
+        additionalProperties: false,
       },
-      required: ["query"],
-      additionalProperties: false,
     },
   },
 ];
