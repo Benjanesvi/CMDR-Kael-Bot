@@ -1,0 +1,13 @@
+# Node
+node_modules/
+dist/
+.env
+.DS_Store
+
+# Data and caches
+data/
+*.log
+
+# Editor
+.vscode/
+.idea/

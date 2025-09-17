@@ -1,0 +1,27 @@
+# render.yaml (Blueprint)
+services:
+  - type: worker
+    name: cmdr-kael
+    env: docker
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TARGET_CHANNEL_ID
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: BGS_PDF_URL
+        sync: false
+      - key: CACHE_TTL_HOURS
+        value: "24"
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
