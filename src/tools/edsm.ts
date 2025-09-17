@@ -1,6 +1,6 @@
 // src/tools/edsm.ts
 // EDSM API wrapper utilities
-import fetch from "node-fetch";
+// Uses global fetch (Node 18+). No node-fetch import required.
 
 const BASE = "https://www.edsm.net/api";
 
@@ -19,6 +19,7 @@ async function get(path: string, params: Record<string, any>) {
 // System info
 // ------------------------------------------------------------------------------------
 export async function getSystem(system: string) {
+  // showId is fine; use showInformation if you want star/region/value metadata.
   return get("/v1/system", { systemName: system, showId: 1 });
 }
 
@@ -31,6 +32,7 @@ export async function getSystemStations(system: string) {
 }
 
 export async function getSystemFactions(system: string) {
+  // EDSM system factions endpoint
   return get("/api-system-v1/factions", { systemName: system });
 }
 
@@ -50,27 +52,30 @@ export async function getSystemValue(system: string) {
 // Station-specific (market, outfitting, shipyard)
 // ------------------------------------------------------------------------------------
 export async function getMarket(system: string, stationName: string) {
-  const stations = await getSystemStations(system);
+  const stations: any = await getSystemStations(system);
+  const target = (stationName || "").toLowerCase();
   const match = (((stations as any)?.stations) || []).find(
-    (s: any) => s.name?.toLowerCase() === (stationName || "").toLowerCase()
+    (s: any) => (s.name || "").toLowerCase() === target
   );
   if (!match) throw new Error(`Station not found: ${stationName}`);
   return get("/v1/station/market", { marketId: match.id });
 }
 
 export async function getOutfitting(system: string, stationName: string) {
-  const stations = await getSystemStations(system);
+  const stations: any = await getSystemStations(system);
+  const target = (stationName || "").toLowerCase();
   const match = (((stations as any)?.stations) || []).find(
-    (s: any) => s.name?.toLowerCase() === (stationName || "").toLowerCase()
+    (s: any) => (s.name || "").toLowerCase() === target
   );
   if (!match) throw new Error(`Station not found: ${stationName}`);
   return get("/v1/station/outfitting", { marketId: match.id });
 }
 
 export async function getShipyard(system: string, stationName: string) {
-  const stations = await getSystemStations(system);
+  const stations: any = await getSystemStations(system);
+  const target = (stationName || "").toLowerCase();
   const match = (((stations as any)?.stations) || []).find(
-    (s: any) => s.name?.toLowerCase() === (stationName || "").toLowerCase()
+    (s: any) => (s.name || "").toLowerCase() === target
   );
   if (!match) throw new Error(`Station not found: ${stationName}`);
   return get("/v1/station/shipyard", { marketId: match.id });

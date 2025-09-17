@@ -1,4 +1,4 @@
-# Optional Docker path (Render can run Node without Docker)
+# Optional: you can delete this file if you use Render's native Node runtime
 FROM node:22-slim
 
 WORKDIR /app
@@ -8,4 +8,4 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-CMD ["node", "--enable-source-maps", "dist/index.js"
+CMD ["node", "--enable-source-maps", "dist/index.js"]

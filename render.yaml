@@ -3,21 +3,17 @@ services:
     name: cmdr-kael
     env: node
     region: oregon
+    plan: starter
     autoDeploy: true
     buildCommand: |
       npm ci
       npm run build
-    startCommand: |
-      node --enable-source-maps dist/index.js
+    startCommand: node --enable-source-maps dist/index.js
     envVars:
       - key: NODE_VERSION
         value: "22"
       - key: NODE_ENV
         value: production
-      - key: CACHE_TTL_HOURS
-        value: "24"
-
-      # Secrets to fill in on Render dashboard:
       - key: DISCORD_TOKEN
         sync: false
       - key: OPENAI_API_KEY
@@ -26,13 +22,19 @@ services:
         sync: false
       - key: ADMIN_IDS
         sync: false
-      - key: BGS_PDF_URL
-        sync: false
+      - key: CACHE_TTL_HOURS
+        value: "24"
+      # Upstash optional (persistent cache / heartbeat writer)
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
+      # Optional integrations
+      - key: EDSM_API_KEY
+        sync: false
       - key: INARA_API_KEY
+        sync: false
+      - key: BGS_PDF_URL
         sync: false
 
   - type: web
@@ -43,15 +45,14 @@ services:
     buildCommand: |
       npm ci
       npm run build
-    startCommand: |
-      node --enable-source-maps dist/server.js
+    startCommand: node --enable-source-maps dist/server.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: "22"
       - key: NODE_ENV
         value: production
-
-      # Needs Upstash creds to read the heartbeat
+      # Needs Upstash creds to read heartbeat
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN

@@ -1,48 +1,32 @@
 // src/tools/inara.ts
-// Thin wrapper for Inara API (faction info, commander info, etc.)
-import fetch from "node-fetch";
-
 const BASE = "https://inara.cz/inapi/v1/";
 
-/**
- * Perform a POST to Inara with your API key and payload.
- */
 async function inaraPost(eventName: string, data: any) {
-  if (!process.env.INARA_API_KEY) {
-    throw new Error("INARA_API_KEY not configured.");
-  }
+  if (!process.env.INARA_API_KEY) throw new Error("INARA_API_KEY not configured.");
+
   const body = {
     header: {
       appName: "CMDR-Kael",
-      appVersion: "0.1",
-      isTesting: false,
+      appVersion: "0.2.0",
       APIkey: process.env.INARA_API_KEY,
+      isTesting: 0
     },
-    events: [{ eventName, eventTimestamp: new Date().toISOString(), eventData: data }],
+    events: [{ eventName, eventTimestamp: Math.floor(Date.now() / 1000), eventData: data }]
   };
 
   const res = await fetch(BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error(`Inara POST ${eventName} → ${res.status}`);
-  const json = await res.json();
-  return json;
+  if (!res.ok) throw new Error(`INARA ${res.status}: ${await res.text()}`);
+  return res.json();
 }
 
-/**
- * Get faction info from Inara (fallback when EDSM doesn't provide).
- */
 export async function bgsFactions(systemName: string) {
-  const result = await inaraPost("getSystemFactions", { systemName });
-  return result;
+  return inaraPost("getSystemFactions", { systemName });
 }
 
-/**
- * Get commander info (if you extend tools later).
- */
 export async function commanderInfo(commanderName: string) {
-  const result = await inaraPost("getCommanderProfile", { searchName: commanderName });
-  return result;
+  return inaraPost("getCommanderProfile", { searchName: commanderName });
 }
