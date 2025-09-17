@@ -10,13 +10,14 @@ services:
     startCommand: |
       node --enable-source-maps dist/index.js
     envVars:
-      # set explicit defaults here
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_ENV
+        value: production
       - key: CACHE_TTL_HOURS
         value: "24"
 
-      # mark secrets to be entered in the dashboard (no defaults)
+      # Secrets to fill in on Render dashboard:
       - key: DISCORD_TOKEN
         sync: false
       - key: OPENAI_API_KEY
@@ -27,6 +28,30 @@ services:
         sync: false
       - key: BGS_PDF_URL
         sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: INARA_API_KEY
+        sync: false
+
+  - type: web
+    name: cmdr-kael-status
+    env: node
+    region: oregon
+    autoDeploy: true
+    buildCommand: |
+      npm ci
+      npm run build
+    startCommand: |
+      node --enable-source-maps dist/server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # Needs Upstash creds to read the heartbeat
       - key: UPSTASH_REDIS_REST_URL
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN

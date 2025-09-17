@@ -1,5 +1,6 @@
 // src/index.ts
 import "dotenv/config";
+import os from "node:os";
 import { Client, GatewayIntentBits, Partials, Message } from "discord.js";
 
 import { chat } from "./llm.js";
@@ -9,6 +10,7 @@ import { splitForDiscord } from "./utils/reply.js";
 import { setPending, hasPending, popNext, clearPending } from "./session.js";
 import { loadPersonaDB, setPersona, resetPersona } from "./persona.js";
 import { loadMemoryDB, remember, forget, listMemoriesAsync } from "./memory.js";
+import { makeUpstashKV } from "./storage.upstash.js";
 
 import {
   validateEnv,
@@ -34,12 +36,62 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message],
 });
 
-client.once("clientReady", async () => {
+// ---------------------
+// Health heartbeat setup
+// ---------------------
+const kv = makeUpstashKV("HEALTH");
+const HEARTBEAT_KEY = "health:heartbeat";
+const hostname = os.hostname();
+
+async function writeHeartbeat(extra: Record<string, any> = {}) {
+  const payload = {
+    ts: Date.now(),
+    bot: client.user?.tag || null,
+    userId: client.user?.id || null,
+    hostname,
+    ready: Boolean(client.user),
+    ...extra,
+  };
+  try {
+    // TTL 120s so the status page marks us stale if we stop updating
+    await kv.set(HEARTBEAT_KEY, JSON.stringify(payload), { ex: 120 });
+  } catch (err) {
+    console.warn("[health] failed to write heartbeat:", err);
+  }
+}
+
+client.once("ready", async () => {
   console.log(`Logged in as ${client.user?.tag}`);
-  try { await initCache(CACHE_PATH); } catch (e) { console.warn(e); }
-  try { loadPersonaDB(); } catch (e) { console.warn(e); }
-  try { loadMemoryDB(); } catch (e) { console.warn(e); }
-  try { await loadPDF(); } catch (e) { console.warn(e); }
+
+  try {
+    await initCache(CACHE_PATH);
+  } catch (e) {
+    console.warn(e);
+  }
+
+  try {
+    loadPersonaDB();
+  } catch (e) {
+    console.warn(e);
+  }
+
+  try {
+    loadMemoryDB();
+  } catch (e) {
+    console.warn(e);
+  }
+
+  try {
+    await loadPDF();
+  } catch (e) {
+    console.warn(e);
+  }
+
+  // first heartbeat immediately, then every 30s
+  await writeHeartbeat();
+  setInterval(() => {
+    writeHeartbeat().catch(() => {});
+  }, 30_000);
 });
 
 async function deliverInChunks(msg: Message, content: string) {
@@ -50,7 +102,9 @@ async function deliverInChunks(msg: Message, content: string) {
   if (rest.length) {
     setPending(msg.channel.id, rest);
     await msg.reply("_(reply **more** for the next part • **stop** to clear)_");
-  } else clearPending(msg.channel.id);
+  } else {
+    clearPending(msg.channel.id);
+  }
 }
 
 client.on("messageCreate", async (msg) => {
@@ -87,7 +141,7 @@ client.on("messageCreate", async (msg) => {
         resetPersona(msg.channel.id);
         await msg.reply("Persona reset.");
         return;
-      }
+        }
       const toneMatch = /^tone\s+(friendly|neutral|gruff|acerbic)$/i.exec(cmd);
       if (toneMatch) {
         setPersona(msg.channel.id, { tone: toneMatch[1].toLowerCase() as any });
@@ -137,7 +191,9 @@ client.on("messageCreate", async (msg) => {
 
   } catch (e) {
     console.error(e);
-    try { await msg.reply("I hit a snag."); } catch {}
+    try {
+      await msg.reply("I hit a snag.");
+    } catch {}
   }
 });
 
